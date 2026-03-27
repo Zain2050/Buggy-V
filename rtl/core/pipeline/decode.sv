@@ -254,3 +254,357 @@ always_comb begin
                                     5'b00100 : begin
                                         id2exe_ctrl.alu_b_ops = ALU_ZBB_OPS_SEXTB;
                                     end
+                                    5'b00101 : begin
+                                        id2exe_ctrl.alu_b_ops = ALU_ZBB_OPS_SEXTH;
+                                    end
+                                    default: illegal_instr  =  1'b1;
+                                endcase
+                            end
+                            7'b0010100: begin
+                                id2exe_data.imm       = `XLEN'(shift_amt);
+                                id2exe_ctrl.alu_b_ops = ALU_ZBS_OPS_BSETI;
+                            end
+                            7'b0100100: begin
+                                id2exe_data.imm       = `XLEN'(shift_amt);
+                                id2exe_ctrl.alu_b_ops = ALU_ZBS_OPS_BCLRI;
+                            end
+                            7'b0110100: begin
+                                id2exe_data.imm       = `XLEN'(shift_amt);
+                                id2exe_ctrl.alu_b_ops = ALU_ZBS_OPS_BINVI;
+                            end
+                            default: illegal_instr  =  1'b1;
+                        endcase
+                    end
+                    3'b101 : begin
+                        case (funct7_opcode)
+                            
+                            7'b0000000 : begin
+                                id2exe_data.imm     = `XLEN'(shift_amt);   
+                                id2exe_ctrl.alu_i_ops = ALU_I_OPS_SRL;          // Shift Right Logical Immediate
+                            end
+                         
+                            7'b0100000 : begin
+                                id2exe_data.imm     = `XLEN'(shift_amt);   
+                                id2exe_ctrl.alu_i_ops = ALU_I_OPS_SRA;          // Shift Right Arithmetic Immediate
+                            end
+                            
+                            7'b0110000 : begin
+                                id2exe_data.imm     = `XLEN'(shift_amt);   
+                                id2exe_ctrl.alu_b_ops = ALU_ZBB_OPS_RORI;          // Shift Right Arithmetic Immediate
+                            end
+
+                            7'b0010100 : begin
+                                id2exe_ctrl.alu_b_ops = ALU_ZBB_OPS_ORC;
+                            end
+
+                            7'b0110100 : begin
+                                id2exe_ctrl.alu_b_ops = ALU_ZBB_OPS_REV8;
+                            end
+
+                            7'b0100100: begin
+                                id2exe_data.imm       = `XLEN'(shift_amt);
+                                id2exe_ctrl.alu_b_ops = ALU_ZBS_OPS_BEXTI;
+                            end
+
+                            default : illegal_instr  =  1'b1;
+                        endcase // funct7_opcode
+                    end
+                endcase // funct3_opcode
+               
+            end // OPCODE_IMM_INST
+
+            // AUIPC operation
+            OPCODE_AUIPC_INST : begin
+                id2exe_ctrl.rd_wrb_sel   = RD_WRB_ALU;
+                id2exe_ctrl.alu_opr1_sel = ALU_OPR1_PC;
+                id2exe_ctrl.alu_opr2_sel = ALU_OPR2_IMM;
+                id2exe_ctrl.alu_i_ops    = ALU_I_OPS_ADD;
+                id2exe_ctrl.rd_wr_req    = 1'b1;                 
+                id2exe_data.imm          = {instr_codeword[31:12], 12'b0};
+               
+            end // OPCODE_AUIPC_INST
+
+            // LUI operation
+            OPCODE_LUI_INST : begin
+                id2exe_ctrl.rd_wrb_sel   = RD_WRB_ALU;
+                id2exe_ctrl.alu_opr2_sel = ALU_OPR2_IMM;
+                id2exe_ctrl.alu_i_ops    = ALU_I_OPS_COPY_OPR2;
+                id2exe_ctrl.rd_wr_req    = 1'b1;                
+                id2exe_data.imm          = {instr_codeword[31:12], 12'b0};
+                
+            end // OPCODE_LUI_INST
+             // Load operations
+            OPCODE_LOAD_INST : begin
+                id2exe_ctrl.rd_wrb_sel   = RD_WRB_DMEM;
+                id2exe_ctrl.alu_opr1_sel = ALU_OPR1_REG;
+                id2exe_ctrl.alu_opr2_sel = ALU_OPR2_IMM;
+                id2exe_ctrl.alu_i_ops    = ALU_I_OPS_ADD;
+                id2exe_ctrl.rd_wr_req    = 1'b1;
+                case (funct3_opcode)
+                    3'b000  : id2exe_ctrl.ld_ops = LD_OPS_LB;            // Load byte signed
+                    3'b001  : id2exe_ctrl.ld_ops = LD_OPS_LH;            // Load halfword signed 
+                    3'b010  : id2exe_ctrl.ld_ops = LD_OPS_LW;            // Load word  
+                    3'b100  : id2exe_ctrl.ld_ops = LD_OPS_LBU;           // Load byte unsigned 
+                    3'b101  : id2exe_ctrl.ld_ops = LD_OPS_LHU;           // Load halfword unsigned 
+                    default : illegal_instr      =  1'b1;                // Illegal instruction 
+                endcase // funct3_opcode
+               
+            end // OPCODE_LOAD_INST
+             // Store operations
+            OPCODE_STORE_INST : begin
+                id2exe_ctrl.alu_opr1_sel = ALU_OPR1_REG;
+                id2exe_ctrl.alu_opr2_sel = ALU_OPR2_IMM;
+                id2exe_ctrl.alu_i_ops    = ALU_I_OPS_ADD;
+                id2exe_data.imm          = {{21{instr_codeword[31]}}, instr_codeword[30:25], instr_codeword[11:7]};
+                case (funct3_opcode)
+                    3'b001  : id2exe_ctrl.st_ops = ST_OPS_SB;            // Store byte signed
+                    3'b000  : id2exe_ctrl.st_ops = ST_OPS_SH;            // Store halfword signed 
+                    3'b010  : id2exe_ctrl.st_ops = ST_OPS_SW;            // Store word
+                    default : illegal_instr      =  1'b1;                // Illegal instruction  
+                endcase // funct3_opcode
+                          
+            end // OPCODE_STORE_INST
+
+             // Memory fence operations
+            OPCODE_MEM_FENCE_INST : begin
+ 
+                case (funct3_opcode)
+                    3'b000  : id2exe_ctrl.fence_req = 1'b1;              // fence instruction is currently NOP
+                                                                         // but will become write buffer flush
+                                                                         // in case of write through cache and 
+                                                                         // cache flush for writeback cache
+                    3'b001  : id2exe_ctrl.fence_i_req = 1'b1;            // fence.i leads to pipeline flush                     
+                    default : illegal_instr           = 1'b1;            // Default case  
+                endcase // funct3_opcode                
+            end // OPCODE_MEM_FENCE_INST
+
+             // Branch operation
+            OPCODE_BRANCH_INST : begin
+                id2exe_ctrl.alu_opr1_sel     = ALU_OPR1_PC;
+                id2exe_ctrl.alu_opr2_sel     = ALU_OPR2_IMM;
+                id2exe_ctrl.alu_cmp_opr2_sel = ALU_CMP_OPR2_REG;
+                id2exe_ctrl.alu_i_ops        = ALU_I_OPS_ADD;
+                id2exe_ctrl.branch_req       = 1'b1;
+                id2exe_data.imm              = {{20{instr_codeword[31]}}, instr_codeword[7], instr_codeword[30:25], instr_codeword[11:8], 1'b0};
+                case (funct3_opcode)
+                    3'b000  : id2exe_ctrl.branch_ops = BR_OPS_EQ;            // Branch equal
+                    3'b001  : id2exe_ctrl.branch_ops = BR_OPS_NE;            // Branch not equal 
+                    3'b100  : id2exe_ctrl.branch_ops = BR_OPS_LT;            // Branch less than 
+                    3'b101  : id2exe_ctrl.branch_ops = BR_OPS_GE;            // Branch greater than or equal signed
+                    3'b110  : id2exe_ctrl.branch_ops = BR_OPS_LTU;           // Branch less than unsigned 
+                    3'b111  : id2exe_ctrl.branch_ops = BR_OPS_GEU;           // Branch greater than or equal unsigned
+                    default : begin                                          // Illegal instruction  
+                        illegal_instr          = 1'b1;
+                        id2exe_ctrl.branch_req = 1'b0;
+                    end
+                endcase // funct3_opcode  */
+                          
+            end // OPCODE_BRANCH_INST
+
+            // JALR operation
+            OPCODE_JALR_INST : begin
+                id2exe_ctrl.rd_wrb_sel   = RD_WRB_INC_PC;
+                id2exe_ctrl.alu_opr1_sel = ALU_OPR1_REG;
+                id2exe_ctrl.alu_opr2_sel = ALU_OPR2_IMM;
+                id2exe_ctrl.alu_i_ops    = ALU_I_OPS_ADD;
+                id2exe_ctrl.rd_wr_req    = 1'b1;
+                id2exe_ctrl.jump_req     = 1'b1;
+           //     id2exe_data.imm           =   {{12{instr_codeword[31]}}, instr_codeword[19:12], instr_codeword[20], instr_codeword[30:21], 1'b0};
+               
+            end // OPCODE_JALR_INST
+             // JAL operation
+            OPCODE_JAL_INST : begin
+                id2exe_ctrl.rd_wrb_sel   = RD_WRB_INC_PC;
+                id2exe_ctrl.alu_opr1_sel = ALU_OPR1_PC;
+                id2exe_ctrl.alu_opr2_sel = ALU_OPR2_IMM;
+                id2exe_ctrl.alu_i_ops    = ALU_I_OPS_ADD;
+                id2exe_ctrl.rd_wr_req    = 1'b1;
+                id2exe_ctrl.jump_req     = 1'b0; // MT JAL
+                id2exe_data.imm          = {{12{instr_codeword[31]}}, instr_codeword[19:12], instr_codeword[20], instr_codeword[30:21], 1'b0};
+                
+            end // OPCODE_JAL_INST
+ 
+            // SYS operations
+            OPCODE_SYSTEM_INST : begin
+                case (funct3_opcode)
+                    3'b001 : begin              // CSRRW
+                        id2exe_ctrl.alu_opr1_sel = ALU_OPR1_REG;
+                        id2exe_ctrl.rd_wrb_sel   = RD_WRB_CSR;
+                        id2exe_ctrl.csr_ops      = CSR_OPS_WRITE;
+                        id2exe_ctrl.csr_opr_sel  = CSR_OPR_REG;
+                    end
+                    3'b010 : begin              // CSRRS
+                        id2exe_ctrl.alu_opr1_sel = ALU_OPR1_REG;
+                        id2exe_ctrl.rd_wrb_sel   = RD_WRB_CSR;
+                        id2exe_ctrl.csr_ops      = CSR_OPS_SET;
+                        id2exe_ctrl.csr_opr_sel  = CSR_OPR_REG;
+                    end
+                    3'b011 : begin             // CSRRC
+                        id2exe_ctrl.alu_opr1_sel = ALU_OPR1_REG;
+                        id2exe_ctrl.rd_wrb_sel   = RD_WRB_CSR;
+                        id2exe_ctrl.csr_ops      = CSR_OPS_CLEAR;
+                        id2exe_ctrl.csr_opr_sel  = CSR_OPR_REG;
+                    end
+                    3'b101 : begin             // CSRIW
+                        id2exe_ctrl.rd_wrb_sel  = RD_WRB_CSR;
+                        id2exe_ctrl.csr_ops     = CSR_OPS_WRITE;
+                        id2exe_ctrl.csr_opr_sel = CSR_OPR_IMM;
+                    end
+                    3'b110 : begin             // CSRIS
+                        id2exe_ctrl.rd_wrb_sel  = RD_WRB_CSR;
+                        id2exe_ctrl.csr_ops     = CSR_OPS_SET;
+                        id2exe_ctrl.csr_opr_sel = CSR_OPR_IMM;
+                    end
+                    3'b111 : begin             // CSRIC
+                        id2exe_ctrl.rd_wrb_sel  = RD_WRB_CSR;
+                        id2exe_ctrl.csr_ops     = CSR_OPS_CLEAR;
+                        id2exe_ctrl.csr_opr_sel = CSR_OPR_IMM;
+                    end
+                    3'b000 : begin
+                                                         
+                        case (funct7_opcode)
+                            7'b0000000 : begin        
+                                case (funct5_opcode)
+                                    5'b00000 : begin  // ECALL                     
+                                        id2exe_ctrl.exc_req  = 1'b1;
+                                        id2exe_data.exc_code = EXC_CODE_ECALL_MMODE;
+                                        case (csr2id_fb.priv_mode)
+                                            PRIV_MODE_M: id2exe_data.exc_code = EXC_CODE_ECALL_MMODE;
+                                            PRIV_MODE_S: id2exe_data.exc_code = EXC_CODE_ECALL_SMODE;
+                                            PRIV_MODE_U: id2exe_data.exc_code = EXC_CODE_ECALL_UMODE;
+                                            default:       ; // this should not have happened
+                                        endcase
+                                       
+                                    end
+                                    5'b00001 : begin  // EBREAK
+                                        id2exe_ctrl.exc_req  = 1'b1;
+                                        id2exe_data.exc_code = EXC_CODE_BREAKPOINT;
+                                    end
+                                    default : illegal_instr  =  1'b1; 
+                                endcase // funct5_opcode
+                            end
+                            7'b0001000 : begin        
+                                case (funct5_opcode)
+                                    5'b00010 : begin  // SRET                     
+                                        id2exe_ctrl.sys_ops    = SYS_OPS_SRET;
+                                    end
+                                    5'b00101 : begin  // WFI
+                                        id2exe_ctrl.sys_ops    = SYS_OPS_WFI;  
+                                    end
+                                    default : illegal_instr  =  1'b1; 
+                                endcase // funct5_opcode                           
+                            end
+                            7'b0011000 : begin        // MRET
+                                id2exe_ctrl.sys_ops    = SYS_OPS_MRET;                               
+                            end
+                            7'b0001001 : begin        // SFENCE.VMA
+                                id2exe_ctrl.sys_ops    = SYS_OPS_SFENCE_VMA;                               
+                            end
+                            default : illegal_instr = 1'b1;
+                        endcase // funct7_opcode
+                         
+                    end
+                                    
+                    default : illegal_instr = 1'b1;   // illegal instruction  
+                endcase // funct3_opcode                                     
+            end // OPCODE_SYS_INST
+
+             // Atomic memory operations (AMO)
+            OPCODE_AMO_INST : begin
+                id2exe_ctrl.rd_wrb_sel   = RD_WRB_DMEM;  // MT: Uncomment for proper AMO operation ???
+                id2exe_ctrl.alu_opr1_sel = ALU_OPR1_REG;
+                id2exe_ctrl.alu_opr2_sel = ALU_OPR2_REG;
+                id2exe_ctrl.ld_ops       = LD_OPS_LW;     
+                id2exe_ctrl.st_ops       = ST_OPS_SW;    // All AMO instructions perfrom SW
+                id2exe_ctrl.alu_i_ops    = ALU_I_OPS_COPY_OPR1;
+                id2exe_ctrl.rd_wr_req    = 1'b1;        //  MT: Uncomment for proper AMO operation ???
+
+                if (funct3_opcode == 3'b010) begin              
+                    case (funct7_opcode[6:2])
+                        5'b00000  : id2exe_ctrl.amo_ops = AMO_OPS_ADD;                  // Atomic addition
+                        5'b00001  : id2exe_ctrl.amo_ops = AMO_OPS_SWAP;                 // Atomic swap
+                        5'b00010  : begin 
+                            id2exe_ctrl.amo_ops = AMO_OPS_LR;                           // Load restricted        
+                            id2exe_ctrl.st_ops  = ST_OPS_NONE;                          // LR does not perform store                      
+                            if (funct5_opcode != '0) illegal_instr = 1'b1;
+                        end
+                        5'b00011  : id2exe_ctrl.amo_ops = AMO_OPS_SC;                   // Store conditional
+                        5'b00100  : id2exe_ctrl.amo_ops = AMO_OPS_XOR;                  // Atomic XOR
+                        5'b01000  : id2exe_ctrl.amo_ops = AMO_OPS_OR;                   // Atomic OR
+                        5'b01100  : id2exe_ctrl.amo_ops = AMO_OPS_AND;                  // Atomic AND
+                        5'b10000  : id2exe_ctrl.amo_ops = AMO_OPS_MIN;                  // Atomic MIN
+                        5'b10100  : id2exe_ctrl.amo_ops = AMO_OPS_MAX;                  // Atomic MAX
+                        5'b11000  : id2exe_ctrl.amo_ops = AMO_OPS_MINU;                 // Atomic MIN unsigned
+                        5'b11100  : id2exe_ctrl.amo_ops = AMO_OPS_MAXU;                 // Atomic MAX unsigned
+                        default   : illegal_instr       = 1'b1;                         // Illegal instructio 
+                    endcase // funct7_opcode[6:2]
+                end else begin
+                    illegal_instr = 1'b1;
+                end  //
+            end // OPCODE_AMO_INST
+
+            default : begin
+                illegal_instr = 1'b1;
+            end
+        endcase // instr_opcode (Instruction opcode) 
+  //  end // no instruction memory fault
+
+   // Handle the illegal instruction
+   if(illegal_instr | if2id_ctrl.exc_req)  begin
+     id2exe_ctrl.alu_i_ops   = ALU_I_OPS_NONE;
+     id2exe_ctrl.alu_m_ops   = ALU_M_OPS_NONE;
+     id2exe_ctrl.alu_b_ops   = ALU_B_OPS_NONE;
+     id2exe_ctrl.alu_d_ops   = ALU_D_OPS_NONE;
+     id2exe_ctrl.ld_ops      = LD_OPS_NONE;
+     id2exe_ctrl.st_ops      = ST_OPS_NONE;
+     id2exe_ctrl.branch_ops  = BR_OPS_NONE;
+     id2exe_ctrl.csr_ops     = CSR_OPS_NONE;
+     id2exe_ctrl.amo_ops     = AMO_OPS_NONE;
+     id2exe_ctrl.sys_ops     = SYS_OPS_NONE;
+
+     id2exe_ctrl.rd_wrb_sel  = RD_WRB_NONE;
+     id2exe_ctrl.exc_req     = 1'b1;
+     id2exe_ctrl.rd_wr_req   = 1'b0;
+     id2exe_ctrl.jump_req    = 1'b0;
+     id2exe_ctrl.branch_req  = 1'b0;
+     id2exe_ctrl.fence_i_req = 1'b0;
+     id2exe_ctrl.fence_req   = 1'b0;
+     
+     if (if2id_ctrl.exc_req) begin
+         id2exe_data.exc_code = if2id_data.exc_code; 
+     end else begin
+     id2exe_data.exc_code    = EXC_CODE_ILLEGAL_INSTR;
+     end
+   end
+
+    
+end // Decoder logic
+
+//=================================== Output signals update ====================================//
+
+// MT TODO: Feedforward (pipeline) signals should be made configurable for enabling/disabling 
+// pipeline stages
+assign id2exe_ctrl.irq_req = if2id_ctrl.irq_req;
+  
+assign id2exe_ctrl_o = id2exe_ctrl;
+assign id2exe_data_o = id2exe_data; 
+
+//================================ Instantiation of submodules =================================//
+// Instantiation of register file
+reg_file rf_module (
+   .rst_n                (rst_n            ),
+   .clk                  (clk              ),
+    // ID <---> RF interface
+   .id2rf_rs1_addr_i     (id2rf_rs1_addr),
+   .rf2id_rs1_data_o     (rf2id_rs1_data),
+   .id2rf_rs2_addr_i     (id2rf_rs2_addr),
+   .rf2id_rs2_data_o     (rf2id_rs2_data),
+   .id2rf_rd_wr_req_i    (wrb2id_fb_i.rd_wr_req),
+   .id2rf_rd_addr_i      (wrb2id_fb_i.rd_addr ),
+   .id2rf_rd_data_i      (wrb2id_fb_i.rd_data)
+ //  .debug_port_i         (debug_port_i)        
+);
+
+
+endmodule : decode
+
